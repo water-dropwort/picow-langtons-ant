@@ -233,6 +233,10 @@ Parameter g_parameter_temp;
 bool g_parameterUpdated = false;
 
 void handleParameter() {
+  g_server.sendHeader("Access-Control-Allow-Origin", "*");
+  g_server.sendHeader("Access-Control-Allow-Credentials","true");
+  g_server.sendHeader("Access-Control-Allow-Methods", "POST");
+
   if(g_server.method() != HTTP_POST) {
     g_server.send(405, "text/plain", "Method not allowed");
     return;
@@ -242,6 +246,7 @@ void handleParameter() {
     g_server.send(400, "text/plain", "Bad request");
     return;
   }
+
   String body = g_server.arg("plain");
   DeserializationError jsonerr = deserializeJson(g_jsondoc, body);
   if(jsonerr) {
@@ -273,3 +278,6 @@ void handleParameter() {
 
   g_server.send(200, "text/plain", "OK");
 }
+
+
+

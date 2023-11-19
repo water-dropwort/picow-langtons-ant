@@ -34,7 +34,7 @@ void task_main(void* pvParams) {
 }
 
 void setup() {
-  Serial.begin();
+  Serial.begin(115200);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   tft.init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   tft.setRotation(0);
