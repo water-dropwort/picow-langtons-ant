@@ -2,6 +2,13 @@
 
 #include <Adafruit_ST7789.h>
 #include <SPI.h>
+#include <FreeRTOS.h>
+#include <task.h>
+#include <semphr.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Arduino.h>
+#include <ArduinoJson.h>
 
 #define PIN_TFT_CS    17
 #define PIN_TFT_RST   22
@@ -18,6 +25,9 @@
 #define DISPLAY_BACK_COLOR ST77XX_BLACK
 #define MAX_ANT_COUNT 10
 #define MAX_RULE_LENGTH 10
+
+#define STASSID xxx
+#define STAPSK  xxx
 
 Adafruit_ST7789 tft = Adafruit_ST7789(&SPI, PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
 
@@ -61,42 +71,65 @@ struct Ant {
   Direction direction;
 };
 
-uint8_t g_matrix[DISPLAY_WIDTH][DISPLAY_HEIGHT];
-Ant g_ants[MAX_ANT_COUNT];
-bool g_isRunning = true;
-uint8_t g_current_ant_count = 1;
-Vector g_updated_cell_indexes[MAX_ANT_COUNT];
-Behaviour g_rule[MAX_RULE_LENGTH];
-uint8_t g_current_rule_length;
-
-void initMatrix(){
-  for(int i = 0; i < DISPLAY_WIDTH; i++){
-    for(int j = 0; j < DISPLAY_HEIGHT; j++){
-      g_matrix[i][j] = 0;
-    }
-  }
+const Ant defaultAnt() {
+  Ant ant;
+  ant.direction = North;
+  ant.position = { DISPLAY_WIDTH / 2,  DISPLAY_HEIGHT / 2 };
+  return ant;
 }
 
-void initAnts(){
+struct Status {
+  uint8_t matrix[DISPLAY_WIDTH][DISPLAY_HEIGHT];
+  Ant ants[MAX_ANT_COUNT];
+  Vector updated_cell_indexes[MAX_ANT_COUNT];
+};
+
+struct Parameter {
+  Ant initial_ants[MAX_ANT_COUNT];
+  uint8_t ant_count;
+  Behaviour rule[MAX_RULE_LENGTH];
+  uint8_t rule_length;
+};
+
+const Parameter defaultParameter(){
+  Parameter parameter;
   for(int i = 0; i < MAX_ANT_COUNT; i++){
-    g_ants[i] = Ant();
-    g_ants[i].direction = North;
-    g_ants[i].position = Vector();
-    g_ants[i].position.x = DISPLAY_WIDTH / 2;
-    g_ants[i].position.y = DISPLAY_HEIGHT / 2;
-  }
-}
-
-void initRule() {
+      parameter.initial_ants[i] = defaultAnt();
+    }
+  parameter.ant_count = 1;
   for(int i = 0; i < MAX_RULE_LENGTH; i++) {
-    g_rule[i] = None;
+    parameter.rule[i] = None;
   }
-  g_rule[0] = Right;
-  g_rule[1] = Left;
-  g_current_rule_length = 2;
+  parameter.rule[0] = Right;
+  parameter.rule[1] = Left;
+  parameter.rule_length = 2;  
+  return parameter;
+};
+
+void moveAnt(Ant *ant) {
+  switch(ant->direction) {
+  case North:
+    if(ant->position.y == 0)
+      ant->position.y = DISPLAY_HEIGHT - 1;
+    else
+      ant->position.y -= 1;
+    break;
+  case East:
+    ant->position.x = (ant->position.x + 1) % DISPLAY_WIDTH;
+    break;
+  case South:
+    ant->position.y = (ant->position.y + 1) % DISPLAY_HEIGHT;
+    break;
+  case West:
+    if(ant->position.x == 0)
+      ant->position.x = DISPLAY_WIDTH - 1;
+    else
+      ant->position.x -= 1;
+    break;
+  }
 }
 
-Direction changeDirection(Direction current_direction, Behaviour behaviour) {
+Direction resolveNewDirection(Direction current_direction, Behaviour behaviour) {
   if(behaviour == Right) {
     switch(current_direction) {
       case North: return East;
@@ -129,44 +162,114 @@ Direction changeDirection(Direction current_direction, Behaviour behaviour) {
   }
 }
 
-void moveAnt(Ant *ant) {
-  switch(ant->direction) {
-    case North:
-      if(ant->position.y == 0)
-        ant->position.y = DISPLAY_HEIGHT - 1;
-      else
-        ant->position.y -= 1;
-      break;
-    case East:
-      ant->position.x = (ant->position.x + 1) % DISPLAY_WIDTH;
-      break;
-    case South:
-      ant->position.y = (ant->position.y + 1) % DISPLAY_HEIGHT;
-      break;
-    case West:
-      if(ant->position.x == 0)
-        ant->position.x = DISPLAY_WIDTH - 1;
-      else
-        ant->position.x -= 1;
-      break;
-  }
-}
+class LangtonsAnt {
+private:
+  Parameter m_parameter;
+  Status m_status;
 
-void updateMatrix(){
-  uint8_t cellValue;
-  for(int i = 0; i < g_current_ant_count; i++) {
-    cellValue = g_matrix[g_ants[i].position.x][g_ants[i].position.y];
-    g_ants[i].direction = changeDirection(g_ants[i].direction, g_rule[cellValue]);
-    g_matrix[g_ants[i].position.x][g_ants[i].position.y] = (cellValue + 1) % g_current_rule_length;
-    g_updated_cell_indexes[i] = g_ants[i].position;
-    moveAnt(&g_ants[i]);
+  void initMatrix(){
+    for(int i = 0; i < DISPLAY_WIDTH; i++){
+      for(int j = 0; j < DISPLAY_HEIGHT; j++){
+        m_status.matrix[i][j] = 0;
+      }
+    }
   }
-}
+  
+public:  
+  void reset() {
+    initMatrix();
+    for(int i = 0; i < MAX_ANT_COUNT; i++) {
+      if(i < m_parameter.ant_count)
+        m_status.ants[i] = m_parameter.initial_ants[i];
+      else
+        m_status.ants[i] = defaultAnt();
+      m_status.updated_cell_indexes[i] = {0,0};
+    }
+  }  
+
+  void updateMatrix(){
+    uint8_t cellValue;
+    for(int i = 0; i < m_parameter.ant_count; i++) {
+      cellValue = m_status.matrix[m_status.ants[i].position.x][m_status.ants[i].position.y];
+      m_status.ants[i].direction = resolveNewDirection(m_status.ants[i].direction, m_parameter.rule[cellValue]);
+      m_status.matrix[m_status.ants[i].position.x][m_status.ants[i].position.y] = (cellValue + 1) % m_parameter.rule_length;
+      m_status.updated_cell_indexes[i] = m_status.ants[i].position;
+      moveAnt(&m_status.ants[i]);
+    }
+  }
+
+  void setParameter(const Parameter& new_parameter) {
+    m_parameter = new_parameter;
+  }
+
+  const Parameter& getParameter() const {
+    return m_parameter;
+  }
+  
+  const Status& getStatus() const {
+    return m_status;
+  }
+};
+
+LangtonsAnt g_langtonsAnt;
 
 void updateDisplay() {
-  for(int i = 0; i < g_current_ant_count; i++) {
-    int x = g_updated_cell_indexes[i].x;
-    int y = g_updated_cell_indexes[i].y;
-    tft.drawPixel(x, y, CELL_COLORS[g_matrix[x][y]]);
+  for(int i = 0; i < g_langtonsAnt.getParameter().ant_count; i++) {
+    int x = g_langtonsAnt.getStatus().updated_cell_indexes[i].x;
+    int y = g_langtonsAnt.getStatus().updated_cell_indexes[i].y;
+    tft.drawPixel(x, y, CELL_COLORS[g_langtonsAnt.getStatus().matrix[x][y]]);
   }
+}
+
+
+#define SERVER_PORT 8888
+
+WebServer g_server(SERVER_PORT);
+StaticJsonDocument<1024> g_jsondoc;
+SemaphoreHandle_t g_sem_parameter_temp;
+
+
+Parameter g_parameter_temp;
+bool g_parameterUpdated = false;
+
+void handleParameter() {
+  if(g_server.method() != HTTP_POST) {
+    g_server.send(405, "text/plain", "Method not allowed");
+    return;
+  }
+
+  if(g_server.hasArg("plain") == false) {
+    g_server.send(400, "text/plain", "Bad request");
+    return;
+  }
+  String body = g_server.arg("plain");
+  DeserializationError jsonerr = deserializeJson(g_jsondoc, body);
+  if(jsonerr) {
+    g_server.send(400, "text/plain", String("Bad request:") + jsonerr.c_str());
+    return;
+  }
+
+  xSemaphoreTake(g_sem_parameter_temp, (TickType_t)0);
+
+  g_parameter_temp.ant_count = (uint8_t)g_jsondoc["ants"]["count"].as<uint32_t>();
+  JsonArray jarr_ants_params = g_jsondoc["ants"]["params"].as<JsonArray>();
+  int antNo = 0;
+  for(JsonVariant jvar : jarr_ants_params) {
+    uint32_t ants_param = jvar.as<uint32_t>();
+    g_parameter_temp.initial_ants[antNo].direction = (Direction)(ants_param & 0x3);
+    g_parameter_temp.initial_ants[antNo].position.x = (ants_param >> 2) & 0xFF;
+    g_parameter_temp.initial_ants[antNo].position.y = (ants_param >> 10) & 0x1FF;
+    antNo++;
+  }
+  g_parameter_temp.rule_length = g_jsondoc["rule"]["length"];
+  uint32_t rule = g_jsondoc["rule"]["rule"].as<uint32_t>();
+  for(int i = 0; i < g_parameter_temp.rule_length; i++) {
+    g_parameter_temp.rule[i] = (Behaviour)((rule >> (2*i)) & 0x3);
+  }
+
+  xSemaphoreGive(g_sem_parameter_temp);
+
+  g_parameterUpdated = true;
+
+  g_server.send(200, "text/plain", "OK");
 }
