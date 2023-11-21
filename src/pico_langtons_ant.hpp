@@ -2,9 +2,8 @@
 
 #include <Adafruit_ST7789.h>
 #include <SPI.h>
-#include <FreeRTOS.h>
-#include <task.h>
-#include <semphr.h>
+#include <pico/sem.h>
+#include <pico/multicore.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <Arduino.h>
@@ -226,8 +225,7 @@ void updateDisplay() {
 
 WebServer g_server(SERVER_PORT);
 StaticJsonDocument<1024> g_jsondoc;
-SemaphoreHandle_t g_sem_parameter_temp;
-
+semaphore_t g_semaphore;
 
 Parameter g_parameter_temp;
 bool g_parameterUpdated = false;
@@ -254,7 +252,7 @@ void handleParameter() {
     return;
   }
 
-  xSemaphoreTake(g_sem_parameter_temp, (TickType_t)0);
+  sem_acquire_timeout_ms(&g_semaphore, 5000);
 
   g_parameter_temp.ant_count = (uint8_t)g_jsondoc["ants"]["count"].as<uint32_t>();
   JsonArray jarr_ants_params = g_jsondoc["ants"]["params"].as<JsonArray>();
@@ -272,7 +270,7 @@ void handleParameter() {
     g_parameter_temp.rule[i] = (Behaviour)((rule >> (2*i)) & 0x3);
   }
 
-  xSemaphoreGive(g_sem_parameter_temp);
+  sem_release(&g_semaphore);
 
   g_parameterUpdated = true;
 

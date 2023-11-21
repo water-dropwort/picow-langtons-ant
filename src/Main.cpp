@@ -2,7 +2,7 @@
 
 bool g_isRunning = true;
 
-void task_main(void* pvParams) {
+void task_main() {
   while(true) {
     if (digitalRead(PIN_BUTTON) == LOW) {
       sleep_ms(20);
@@ -15,9 +15,9 @@ void task_main(void* pvParams) {
     if(g_parameterUpdated) {
       g_parameterUpdated = false;
 
-      xSemaphoreTake(g_sem_parameter_temp, (TickType_t)0);
+      sem_acquire_timeout_ms(&g_semaphore, 5000);
       g_langtonsAnt.setParameter(g_parameter_temp);
-      xSemaphoreGive(g_sem_parameter_temp);
+      sem_release(&g_semaphore);
 
       g_langtonsAnt.reset();
       tft.fillScreen(DISPLAY_BACK_COLOR);
@@ -48,15 +48,9 @@ void setup() {
   g_server.on("/parameter", handleParameter);
   g_server.begin();
 
-  g_sem_parameter_temp = xSemaphoreCreateBinary();
-  xSemaphoreGive(g_sem_parameter_temp);
+  sem_init(&g_semaphore, 0, 1);
 
-  xTaskCreate(task_main,
-              "Main Task",
-              configMINIMAL_STACK_SIZE,
-              NULL,
-              tskIDLE_PRIORITY,
-              NULL);
+  multicore_launch_core1(task_main);
 }
 
 void loop() {
