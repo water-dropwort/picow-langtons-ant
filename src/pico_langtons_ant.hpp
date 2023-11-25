@@ -28,6 +28,13 @@
 #define STASSID xxx
 #define STAPSK  xxx
 
+#define DISPLAY_FORE_COLOR ST77XX_WHITE
+#define DISPLAY_OK_FORE_COLOR ST77XX_GREEN
+#define DISPLAY_NG_FORE_COLOR ST77XX_RED
+
+#define TIMEOUT_MS_WIFICONN 30000
+#define TIMEOUT_MS_SEMAPHORE 5000
+
 Adafruit_ST7789 tft = Adafruit_ST7789(&SPI, PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
 
 // CELL_COLORSの長さはMAX_RULE_LENGTHと等しくなること。
@@ -252,7 +259,7 @@ void handleParameter() {
     return;
   }
 
-  sem_acquire_timeout_ms(&g_semaphore, 5000);
+  sem_acquire_timeout_ms(&g_semaphore, TIMEOUT_MS_SEMAPHORE);
 
   g_parameter_temp.ant_count = (uint8_t)g_jsondoc["ants"]["count"].as<uint32_t>();
   JsonArray jarr_ants_params = g_jsondoc["ants"]["params"].as<JsonArray>();
@@ -276,6 +283,3 @@ void handleParameter() {
 
   g_server.send(200, "text/plain", "OK");
 }
-
-
-
