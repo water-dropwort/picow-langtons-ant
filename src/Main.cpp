@@ -86,6 +86,9 @@ void setup() {
     WiFi.disconnect(true);
   }
 
+  initializeColorPalette(CELL_COLORS_START, CELL_COLORS_MID, CELL_COLORS_END);
+  showColorPalette(30, 110, DISPLAY_WIDTH - 30*2);
+
   sem_init(&g_semaphore, 0, 1);
 
   multicore_launch_core1(task_main);

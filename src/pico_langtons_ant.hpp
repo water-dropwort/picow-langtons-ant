@@ -23,7 +23,7 @@
 
 #define DISPLAY_BACK_COLOR ST77XX_BLACK
 #define MAX_ANT_COUNT 10
-#define MAX_RULE_LENGTH 10
+#define MAX_RULE_LENGTH 20
 
 #define STASSID xxx
 #define STAPSK  xxx
@@ -37,19 +37,10 @@
 
 Adafruit_ST7789 tft = Adafruit_ST7789(&SPI, PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
 
-// CELL_COLORSの長さはMAX_RULE_LENGTHと等しくなること。
-const uint16_t CELL_COLORS[] = {
-  DISPLAY_BACK_COLOR,
-  0x4000,
-  0x6000,
-  0x8000,
-  0xA000,
-  0xC000,
-  0xE000,
-  0xFC00,
-  0xF800,
-  0xF000,
-};
+uint16_t g_color_palette[MAX_RULE_LENGTH];
+#define CELL_COLORS_START ST77XX_MAGENTA
+#define CELL_COLORS_MID ST77XX_GREEN
+#define CELL_COLORS_END ST77XX_YELLOW
 
 enum Direction
 {
@@ -211,19 +202,66 @@ public:
   const Parameter& getParameter() const {
     return m_parameter;
   }
-  
-  const Status& getStatus() const {
-    return m_status;
-  }
+
+  const Status &getStatus() const { return m_status; }
 };
 
 LangtonsAnt g_langtonsAnt;
+
+void initializeColorPalette(uint16_t start_color, uint16_t mid_color, uint16_t end_color) {
+  uint16_t start_r = (start_color >> 11) & 0x1F;
+  uint16_t start_g = (start_color >> 5) & 0x3F;
+  uint16_t start_b = start_color & 0x1F;
+  Serial.printf("Start R:%d,G:%d,B:%d\n", start_r, start_g, start_b);
+  uint16_t mid_r = (mid_color >> 11) & 0x1F;
+  uint16_t mid_g = (mid_color >> 5) & 0x3F;
+  uint16_t mid_b = mid_color & 0x1F;
+  Serial.printf("Mid R:%d,G:%d,B:%d\n", mid_r, mid_g, mid_b);
+  uint16_t end_r = (end_color >> 11) & 0x1F;
+  uint16_t end_g = (end_color >> 5) & 0x3F;
+  uint16_t end_b = end_color & 0x1F;
+  Serial.printf("End R:%d,G:%d,B:%d\n", end_r, end_g, end_b);
+  float step_r_sm = (float)(mid_r - start_r) / ((MAX_RULE_LENGTH - 1) / 2);
+  float step_g_sm = (float)(mid_g - start_g) / ((MAX_RULE_LENGTH - 1) / 2);
+  float step_b_sm = (float)(mid_b - start_b) / ((MAX_RULE_LENGTH - 1) / 2);
+  Serial.printf("Step R:%f,G:%f,B:%f\n", step_r_sm, step_g_sm, step_b_sm);
+  float step_r_me = (float)(end_r - mid_r) / ((MAX_RULE_LENGTH - 1) / 2);
+  float step_g_me = (float)(end_g - mid_g) / ((MAX_RULE_LENGTH - 1) / 2);
+  float step_b_me = (float)(end_b - mid_b) / ((MAX_RULE_LENGTH - 1) / 2);
+  Serial.printf("Step R:%f,G:%f,B:%f\n", step_r_me, step_g_me, step_b_me);
+
+  g_color_palette[0] = DISPLAY_BACK_COLOR;
+  uint16_t r = 0;
+  uint16_t g = 0;
+  uint16_t b = 0;
+  for(int i = 1; i < MAX_RULE_LENGTH / 2; i++) {
+    r = (start_r + step_r_sm * (i-1));
+    g = (start_g + step_g_sm * (i-1));
+    b = (start_b + step_b_sm * (i-1));
+    g_color_palette[i] = ((r & 0x1F) << 11)| ((g & 0x3F) << 5) | (b & 0x1F);
+    Serial.printf("Step[%d] R:%d,G:%d.B:%d\n", i, r, g, b);
+  }
+  for(int i = MAX_RULE_LENGTH / 2; i < MAX_RULE_LENGTH; i++) {
+    r = (mid_r + step_r_me * (i-(MAX_RULE_LENGTH / 2)));
+    g = (mid_g + step_g_me * (i-(MAX_RULE_LENGTH / 2)));
+    b = (mid_b + step_b_me * (i-(MAX_RULE_LENGTH / 2)));
+    g_color_palette[i] = ((r & 0x1F) << 11)| ((g & 0x3F) << 5) | (b & 0x1F);
+    Serial.printf("Step[%d] R:%d,G:%d.B:%d\n", i, r, g, b);
+  }
+}
+
+void showColorPalette(int16_t x, int16_t y, int16_t w) {
+  int16_t rect_size = ((w - MAX_RULE_LENGTH * 2) / MAX_RULE_LENGTH);
+  for(int i = 0; i < MAX_RULE_LENGTH; i++) {
+    tft.fillRect(x + i * (rect_size + 2), y, rect_size, rect_size, g_color_palette[i]);
+  }
+}
 
 void updateDisplay() {
   for(int i = 0; i < g_langtonsAnt.getParameter().ant_count; i++) {
     int x = g_langtonsAnt.getStatus().updated_cell_indexes[i].x;
     int y = g_langtonsAnt.getStatus().updated_cell_indexes[i].y;
-    tft.drawPixel(x, y, CELL_COLORS[g_langtonsAnt.getStatus().matrix[x][y]]);
+    tft.drawPixel(x, y, g_color_palette[g_langtonsAnt.getStatus().matrix[x][y]]);
   }
 }
 
