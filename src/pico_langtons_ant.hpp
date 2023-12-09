@@ -99,7 +99,7 @@ const Parameter defaultParameter(){
   }
   parameter.rule[0] = Right;
   parameter.rule[1] = Left;
-  parameter.rule_length = 2;  
+  parameter.rule_length = 2;
   return parameter;
 };
 
@@ -171,8 +171,8 @@ private:
       }
     }
   }
-  
-public:  
+
+public:
   void reset() {
     initMatrix();
     for(int i = 0; i < MAX_ANT_COUNT; i++) {
@@ -182,7 +182,7 @@ public:
         m_status.ants[i] = defaultAnt();
       m_status.updated_cell_indexes[i] = {0,0};
     }
-  }  
+  }
 
   void updateMatrix(){
     uint8_t cellValue;
@@ -275,10 +275,14 @@ semaphore_t g_semaphore;
 Parameter g_parameter_temp;
 bool g_parameterUpdated = false;
 
-void handleParameter() {
+void setHeaders() {
   g_server.sendHeader("Access-Control-Allow-Origin", "*");
   g_server.sendHeader("Access-Control-Allow-Credentials","true");
   g_server.sendHeader("Access-Control-Allow-Methods", "POST");
+}
+
+void handleParameter() {
+  setHeaders();
 
   if(g_server.method() != HTTP_POST) {
     g_server.send(405, "text/plain", "Method not allowed");
@@ -320,4 +324,9 @@ void handleParameter() {
   g_parameterUpdated = true;
 
   g_server.send(200, "text/plain", "OK");
+}
+
+void handleNotFound() {
+  setHeaders();
+  g_server.send(404, "text/plain", "Not Found");
 }

@@ -51,7 +51,7 @@ void setup() {
 
   tft.setTextColor(DISPLAY_FORE_COLOR, DISPLAY_BACK_COLOR);
   tft.setTextSize(2);
-  
+
   tft.setCursor(30, 10);
   tft.println("Langton's Ant");
   tft.setCursor(30, 40);
@@ -74,6 +74,7 @@ void setup() {
     tft.printf(":%d\n", SERVER_PORT);
 
     g_server.on("/parameter", handleParameter);
+    g_server.onNotFound(handleNotFound);
     g_server.begin();
   }
   else {
