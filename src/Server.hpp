@@ -73,7 +73,11 @@ private:
       return;
     }
 
-    sem_acquire_timeout_ms(m_semaphore, TIMEOUT_MS_SEMAPHORE);
+    bool acquired = sem_acquire_timeout_ms(m_semaphore, TIMEOUT_MS_SEMAPHORE);
+    if(acquired == false) {
+      m_server->send(503, "text/plain", "Service Unavailable");
+      return;
+    }
 
     m_parameter.antCount
       = static_cast<uint8_t>(m_jsonDoc["ants"]["count"]
