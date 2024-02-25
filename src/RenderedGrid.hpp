@@ -5,7 +5,11 @@
 #include <array>
 #include "IGrid.hpp"
 #include "Consts.hpp"
+#ifdef GRAD_RGB_PALETTE
 #include "GradientPalette.hpp"
+#else
+#include "HLSGradientPalette.hpp"
+#endif
 
 template <size_t Width, size_t Height>
 class RenderedGrid : public IGrid {
@@ -15,11 +19,18 @@ public:
     , m_width(Width)
     , m_height(Height)
   {
+#ifdef GRAD_RGB_PALETTE
     makeGradientPalette(COLOR_BACKGROUND,
                         COLOR_PALETTE_START,
                         COLOR_PALETTE_MID,
                         COLOR_PALETTE_END,
                         m_palette);
+#else
+    makeHLSGradientPalette(COLOR_BACKGROUND,
+                           COLOR_PALETTE_START,
+                           COLOR_PALETTE_END,
+                           m_palette);
+#endif
   }
 
   int16_t width() override { return m_width; }
