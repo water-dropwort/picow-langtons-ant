@@ -14,9 +14,14 @@
 
 // Colors
 #define COLOR_BACKGROUND    0x0000
+#ifdef GRAD_RGB_PALETTE
 #define COLOR_PALETTE_START 0xf81f
 #define COLOR_PALETTE_MID   0x03e0
 #define COLOR_PALETTE_END   0xffe0
+#else
+#define COLOR_PALETTE_START 0x8f71
+#define COLOR_PALETTE_END   0xfdb7
+#endif
 #define COLOR_FOREGROUND    0xFFFF
 #define COLOR_FOREGROUND_OK 0xffe0
 #define COLOR_FOREGROUND_NG 0xf800
