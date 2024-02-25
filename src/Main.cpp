@@ -45,7 +45,7 @@ void setup() {
   // Create Simulator.
   g_langtonsAnt = new LangtonsAnt(*g_grid);
   // Initialize semaphore.
-  sem_init(&g_semaphore, 0, 1);
+  sem_init(&g_semaphore, 1, 1);
 
   // === OPENING SCREEN ===
   printOpeningMsg();
