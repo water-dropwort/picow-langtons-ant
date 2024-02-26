@@ -1,0 +1,41 @@
+#include "unity.h"
+#include "Direction.hpp"
+
+void test_function_newDirection() {
+  // North
+  TEST_ASSERT(newDirection(Direction::North, Behaviour::Left)
+              == Direction::West);
+  TEST_ASSERT(newDirection(Direction::North, Behaviour::None)
+              == Direction::North);
+  TEST_ASSERT(newDirection(Direction::North, Behaviour::Right)
+              == Direction::East);
+  TEST_ASSERT(newDirection(Direction::North, Behaviour::UTurn)
+              == Direction::South);
+  // East
+  TEST_ASSERT(newDirection(Direction::East, Behaviour::Left)
+              == Direction::North);
+  TEST_ASSERT(newDirection(Direction::East, Behaviour::None)
+              == Direction::East);
+  TEST_ASSERT(newDirection(Direction::East, Behaviour::Right)
+              == Direction::South);
+  TEST_ASSERT(newDirection(Direction::East, Behaviour::UTurn)
+              == Direction::West);
+  // South
+  TEST_ASSERT(newDirection(Direction::South, Behaviour::Left)
+              == Direction::East);
+  TEST_ASSERT(newDirection(Direction::South, Behaviour::None)
+              == Direction::South);
+  TEST_ASSERT(newDirection(Direction::South, Behaviour::Right)
+              == Direction::West);
+  TEST_ASSERT(newDirection(Direction::South, Behaviour::UTurn)
+              == Direction::North);
+  // West
+  TEST_ASSERT(newDirection(Direction::West, Behaviour::Left)
+              == Direction::South);
+  TEST_ASSERT(newDirection(Direction::West, Behaviour::None)
+              == Direction::West);
+  TEST_ASSERT(newDirection(Direction::West, Behaviour::Right)
+              == Direction::North);
+  TEST_ASSERT(newDirection(Direction::West, Behaviour::UTurn)
+              == Direction::East);
+}
